@@ -3,6 +3,13 @@
 > 项目目录：`C:\Users\kqm\.zcode\workspace\default`
 > 所有改动只发生在 `recorder.html`（单文件应用），改完按下面流程发布即可。
 
+## 〇、正式地址与发布（最重要）
+
+- **固定网址：https://kerui-wonder.github.io/langdu-daka/recorder.html**（GitHub Pages，免费、HTTPS、不依赖本机开机）
+- **发布/更新只需一条命令**：`python deploy.py`（自动把 8 个文件传到 GitHub 仓库 `kerui-wonder/langdu-daka` 并等待上线）
+- GitHub 授权保存在本机 `ghcli` 目录里；若某天提示未授权，重新执行 `ghcli\bin\gh.exe auth login --web`
+- 临时隧道方案（第三节）已降级为备用；正式入口请认准上面的固定网址
+
 ## 一、每次改版的固定动作（缺一不可）
 
 1. **只改 `recorder.html`**，保持单文件自包含
