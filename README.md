@@ -71,7 +71,8 @@ cloudflared.exe tunnel --url http://127.0.0.1:8765 --no-autoupdate
 
 1. 只改 `task-tracker.html`，保持单文件自包含
 2. 版本号两处一起 +1：`task-tracker-sw.js` 的 `CACHE`（如 `task-tracker-v1` → `v2`）和页面底部「版本 v1」文字
-3. 本地验证：同一个 `python -m http.server 8765` 服务下打开 `http://127.0.0.1:8765/task-tracker.html`
+3. 本地验证/日常运行：`python server.py 8765`（自带静态服务 + 每日提醒推送，替代 http.server）；或直接双击「打开任务追踪.bat」
+4. 每日推送：页面「⚙ 提醒设置」里配置渠道与密钥（Server酱 / PushPlus / Bark）和提醒时间；页面每次改动会自动把复习排期同步给 server.py（tracker-sync.json），到点推送今日清单。推送需要电脑开机且服务在运行
 4. 数据存于浏览器 localStorage，键名 `task-tracker-v1`（**不要改名**，旧数据会丢）；跨设备迁移用「备份 JSON / 导入备份」
 5. 新增数据字段必须同步三处：`normalize()` 默认值 → `save()` → 导入合并（`doImport` 后统一走 `normalize()`）
 6. 双击以 `file://` 打开也能用（Service Worker 会自动跳过），但 PWA 安装必须走 http(s)
