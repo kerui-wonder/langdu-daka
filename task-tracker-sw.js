@@ -1,6 +1,6 @@
 /* 任务执行追踪 Service Worker：cache-first + 后台静默更新（与 recorder 的 sw.js 同策略） */
 'use strict';
-const CACHE = 'task-tracker-v7';
+const CACHE = 'task-tracker-v8';
 const ASSETS = [
   './task-tracker.html',
   './task-tracker.webmanifest',
