@@ -207,7 +207,7 @@
     </div>
   </div>
 
-  <div class="footer">任务复习追踪 · 版本 v7</div>
+  <div class="footer">任务复习追踪 · 版本 v8</div>
 </div>
 
 <div class="modal-mask" id="modalMask">
@@ -366,11 +366,14 @@ function addSub(taskId, inputEl) {
   if (dup) { toast('已有同名子任务'); inputEl.value = ''; return; }
   t.subs.push({ id: uid(), title: title, review: newReview() });
   inputEl.value = '';
+  subInputOpen[taskId] = false; /* 添加一条后收起输入框，防止连续误加 */
   save(); renderReview();
+  toast('子任务已添加，明天开始它的第 1 次复习');
 }
 
 function subKeydown(event, taskId) {
   if (event.isComposing || event.keyCode === 229) return; /* 输入法选字回车不算提交 */
+  if (event.repeat) return; /* 按住回车不重复提交 */
   if (event.key === 'Enter') addSub(taskId, event.target);
 }
 
