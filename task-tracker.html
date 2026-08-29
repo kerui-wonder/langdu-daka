@@ -151,7 +151,10 @@
 <body>
 <div class="wrap">
   <h1>任务复习追踪</h1>
-  <div class="sub">任务按 1 → 3 → 7 → 14 → 30 天复习；有子任务时，只复习子任务，且每个子任务相互独立</div>
+  <div class="sub">任务按 1 → 3 → 7 → 14 → 30 天复习；有子任务时，只复习子任务，且每个子任务相互独立
+    <button class="ghost" onclick="openSettings()" style="margin-left:6px">⚙ 提醒设置</button>
+    <span id="syncState" class="rv-title"></span>
+  </div>
 
   <div class="stats">
     <div class="stat"><div class="num" id="stDue">0</div><div class="lbl">今日待复习（含逾期）</div></div>
@@ -207,7 +210,7 @@
     </div>
   </div>
 
-  <div class="footer">任务复习追踪 · 版本 v8</div>
+  <div class="footer">任务复习追踪 · 版本 v9</div>
 </div>
 
 <div class="modal-mask" id="modalMask">
@@ -235,7 +238,10 @@ function load() {
   normalize();
   save();
 }
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function save() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  syncSoon();
+}
 function newReview() { return { enabled: true, anchor: startOfToday(), done: [null, null, null, null, null] }; }
 function normalize() {
   state.tasks.forEach(function (t) {
@@ -391,6 +397,123 @@ function toggleSubInput(taskId) {
     var el = document.getElementById('subInput-' + taskId);
     if (el) el.focus();
   }
+}
+
+/* ---------- 提醒推送（配合本地服务 server.py） ---------- */
+var pushCfg = { channel: 'none', key: '', time: '08:30', hasKey: false };
+var serverConnected = false;
+var syncTimer = null;
+
+function loadPushCfg() {
+  try {
+    var raw = localStorage.getItem('task-tracker-push');
+    if (raw) pushCfg = Object.assign(pushCfg, JSON.parse(raw));
+  } catch (e) { /* 忽略损坏配置 */ }
+}
+function savePushCfg() {
+  localStorage.setItem('task-tracker-push', JSON.stringify(pushCfg));
+}
+
+function buildSyncPayload() {
+  var items = [];
+  allItems().forEach(function (item) {
+    var rv = rvOf(item);
+    if (rvNext(rv) < 0) return; /* 已全部完成的不推送 */
+    var entries = REVIEW_DAYS.map(function (days, i) {
+      return { due: fmtDate(rvDueDate(rv, i)), done: rv.done[i] ? fmtDate(rv.done[i].ts) : null };
+    });
+    items.push({ name: item.t.name + (item.s ? ' · ' + item.s.title : ''), entries: entries });
+  });
+  return { items: items, config: pushCfg };
+}
+
+function syncSoon() {
+  if (location.protocol.indexOf('http') !== 0) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 800);
+}
+
+function syncNow() {
+  if (location.protocol.indexOf('http') !== 0) return;
+  fetch('/api/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(buildSyncPayload())
+  }).then(function (r) { return r.json(); }).then(function (res) {
+    serverConnected = !!(res && res.ok);
+    updateSyncState();
+  }).catch(function () {
+    serverConnected = false;
+    updateSyncState();
+  });
+}
+
+function updateSyncState() {
+  var el = document.getElementById('syncState');
+  if (!el) return;
+  el.textContent = serverConnected
+    ? '· 提醒服务已连接（每日 ' + (pushCfg.time || '08:30') + '）'
+    : '· 提醒服务未连接';
+}
+
+function loadStatus() {
+  if (location.protocol.indexOf('http') !== 0) { updateSyncState(); return; }
+  fetch('/api/status').then(function (r) { return r.json(); }).then(function (res) {
+    if (res && res.ok) {
+      serverConnected = true;
+      pushCfg.channel = res.config.channel || 'none';
+      pushCfg.time = res.config.time || '08:30';
+      pushCfg.hasKey = !!res.config.has_key;
+      savePushCfg();
+    }
+    updateSyncState();
+    syncSoon();
+  }).catch(function () {
+    serverConnected = false;
+    updateSyncState();
+  });
+}
+
+function openSettings() {
+  openModal('提醒设置',
+    '<div class="field"><label>每日提醒时间</label><input type="time" id="mTime" value="' + esc(pushCfg.time || '08:30') + '"></div>' +
+    '<div class="field"><label>推送渠道</label><select id="mChannel">' +
+      '<option value="none">不推送</option>' +
+      '<option value="serverchan">Server酱（推送到微信）</option>' +
+      '<option value="pushplus">PushPlus（推送到微信）</option>' +
+      '<option value="bark">Bark（推送到 iPhone）</option>' +
+    '</select></div>' +
+    '<div class="field"><label>推送密钥 / SendKey</label><input type="text" id="mKey" placeholder="' +
+      (pushCfg.hasKey ? '已配置，留空保持不变' : '粘贴你的 SendKey / Token') + '"></div>' +
+    '<div class="hint">提醒通过本地服务（python server.py）每天定时发送：Server酱 在 sct.ftqq.com 微信扫码后复制 SendKey；PushPlus 在 pushplus.plus 获取 token；Bark 在 App 内复制 key。电脑需开机且服务在运行。修改后点「保存」，可先「发送测试」验证。</div>',
+    [{ label: '发送测试', fn: function () {
+        var cfg = readSettings();
+        if (location.protocol.indexOf('http') !== 0) { toast('未连接本地提醒服务'); return; }
+        fetch('/api/test-push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: cfg }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { toast(res.ok ? '测试消息已发送，请到微信/手机查收' : '发送失败：' + (res.msg || '')); })
+          .catch(function () { toast('未连接本地提醒服务'); });
+      } },
+     { label: '保存', cls: 'primary', fn: function () {
+        var cfg = readSettings();
+        pushCfg.channel = cfg.channel;
+        pushCfg.time = cfg.time;
+        if (cfg.key) pushCfg.key = cfg.key;
+        pushCfg.hasKey = !!pushCfg.key;
+        savePushCfg();
+        save();
+        toast('提醒设置已保存');
+        closeModal();
+      } }]);
+  setTimeout(function () { document.getElementById('mChannel').value = pushCfg.channel || 'none'; }, 50);
+}
+
+function readSettings() {
+  return {
+    time: document.getElementById('mTime').value || '08:30',
+    channel: document.getElementById('mChannel').value,
+    key: document.getElementById('mKey').value.trim()
+  };
 }
 
 /* ---------- 任务 ---------- */
@@ -776,8 +899,11 @@ document.getElementById('newTaskName').addEventListener('keydown', function (e) 
   if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Enter') addTask();
 });
+loadPushCfg();
 load();
 renderAll();
+loadStatus();
+syncSoon();
 
 /* PWA：本地服务下注册 Service Worker；file:// 直接打开时自动跳过 */
 if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
