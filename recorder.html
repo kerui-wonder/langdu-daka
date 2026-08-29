@@ -201,8 +201,8 @@ nav button.active{color:var(--blue);font-weight:700}
       <h2 class="sec">每日目标遍数</h2>
       <div id="repList"></div>
       <div class="empty" id="emptyMine" hidden><p>先去添加脚本吧。</p></div>
-      <div class="mine-group">数据管理</div>
-      <div class="databtns">
+      <div class="mine-group" id="dmToggle" style="cursor:pointer;user-select:none">数据管理 <span id="dmArrow" style="display:inline-block;transition:transform .2s">▸</span></div>
+      <div class="databtns" id="dmPanel" style="display:none">
         <button class="databtn" id="btnExport">📦 备份<small>含录音 JSON</small></button>
         <button class="databtn" id="btnExportText">📄 仅文字备份<small>体积小</small></button>
         <button class="databtn" id="btnImport">📥 恢复备份<small>从 JSON 导入</small></button>
@@ -211,7 +211,7 @@ nav button.active{color:var(--blue);font-weight:700}
         <button class="databtn" id="btnAutoClean">🧹 达标自动清录音<small id="autoCleanState"></small></button>
         <button class="databtn danger" id="btnClear" style="grid-column:1/-1">🗑️ 清空全部数据</button>
       </div>
-      <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:16px" id="verTag">版本 v10</div>
+      <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:16px" id="verTag">版本 v11</div>
       <input type="file" id="fileImport" accept=".json,application/json" hidden>
     </section>
   </main>
@@ -703,6 +703,11 @@ function setTrash(label,undo){
 }
 function dismissUndo(){undoData=null;$('#undoBar').classList.remove('show')}
 $('#btnUndo').onclick=function(){if(undoData){var f=undoData;undoData=null;f()}dismissUndo()};
+$('#dmToggle').onclick=function(){
+  var open=$('#dmPanel').style.display!=='none';
+  $('#dmPanel').style.display=open?'none':'grid';
+  $('#dmArrow').style.transform=open?'':'rotate(90deg)';
+};
 
 /* ============ 备份 / 恢复 / 打包 ============ */
 function blobToB64(blob){
