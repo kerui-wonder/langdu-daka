@@ -1,5 +1,5 @@
 // 朗读打卡台 Service Worker —— 修改任何缓存行为后必须升级 CACHE 版本号
-const CACHE = 'recorder-v10';
+const CACHE = 'recorder-v11';
 const SHELL = [
   './',
   './index.html',
