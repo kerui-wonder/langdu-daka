@@ -29,7 +29,10 @@ button{font:inherit;border:0;background:none;cursor:pointer;color:inherit;touch-
 .hero{
   background:linear-gradient(135deg,var(--blue),var(--purple));
   color:#fff;padding:26px 20px 22px;border-radius:0 0 28px 28px;
+  position:relative;
 }
+.gear{position:absolute;top:16px;left:16px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.22);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center}
+.gear:active{background:rgba(255,255,255,.35)}
 .hero h1{font-size:20px;font-weight:700;letter-spacing:.5px}
 .hero .sub{font-size:12px;opacity:.85;margin-top:2px}
 .stats{display:flex;gap:10px;margin-top:16px}
@@ -162,6 +165,7 @@ nav button.active{color:var(--blue);font-weight:700}
 <div class="app">
 
   <header class="hero">
+    <button class="gear" id="btnSettings" aria-label="设置">⚙</button>
     <h1>朗读打卡台</h1>
     <div class="sub">照着念一遍 · 录音打卡 · 看见坚持</div>
     <div class="stats">
@@ -201,19 +205,26 @@ nav button.active{color:var(--blue);font-weight:700}
       <h2 class="sec">每日目标遍数</h2>
       <div id="repList"></div>
       <div class="empty" id="emptyMine" hidden><p>先去添加脚本吧。</p></div>
-      <div class="databtns" id="dmPanel" style="display:none">
-        <button class="databtn" id="btnExport">📦 备份<small>含录音 JSON</small></button>
-        <button class="databtn" id="btnExportText">📄 仅文字备份<small>体积小</small></button>
-        <button class="databtn" id="btnImport">📥 恢复备份<small>从 JSON 导入</small></button>
-        <button class="databtn" id="btnZip">🗜️ 打包下载<small>全部录音 zip</small></button>
-        <button class="databtn" id="btnInstall" hidden>📲 安装到桌面<small>像 App 一样使用</small></button>
-        <button class="databtn" id="btnAutoClean">🧹 达标自动清录音<small id="autoCleanState"></small></button>
-        <button class="databtn danger" id="btnClear" style="grid-column:1/-1">🗑️ 清空全部数据</button>
-      </div>
-      <div style="text-align:center;font-size:11px;color:#aab3c5;margin-top:16px;padding:8px 0;cursor:pointer" id="verTag">版本 v13</div>
+      <div style="text-align:center;font-size:11px;color:#aab3c5;margin-top:16px;padding:8px 0" id="verTag">版本 v14</div>
       <input type="file" id="fileImport" accept=".json,application/json" hidden>
     </section>
   </main>
+
+  <!-- 设置面板 -->
+  <div class="mask" id="setMask"></div>
+  <div class="sheet" id="setSheet">
+    <h3>设置</h3>
+    <div class="databtns" id="dmPanel">
+      <button class="databtn" id="btnExport">📦 备份<small>含录音 JSON</small></button>
+      <button class="databtn" id="btnExportText">📄 仅文字备份<small>体积小</small></button>
+      <button class="databtn" id="btnImport">📥 恢复备份<small>从 JSON 导入</small></button>
+      <button class="databtn" id="btnZip">🗜️ 打包下载<small>全部录音 zip</small></button>
+      <button class="databtn" id="btnInstall" hidden>📲 安装到桌面<small>像 App 一样使用</small></button>
+      <button class="databtn" id="btnAutoClean">🧹 达标自动清录音<small id="autoCleanState"></small></button>
+      <button class="databtn danger" id="btnClear" style="grid-column:1/-1">🗑️ 清空全部数据</button>
+    </div>
+    <button class="ghost" id="btnCloseSet">关闭</button>
+  </div>
 
   <div class="fab">
     <span class="lbl">添加</span>
@@ -702,12 +713,16 @@ function setTrash(label,undo){
 }
 function dismissUndo(){undoData=null;$('#undoBar').classList.remove('show')}
 $('#btnUndo').onclick=function(){if(undoData){var f=undoData;undoData=null;f()}dismissUndo()};
-$('#verTag').onclick=function(){
-  var panel=$('#dmPanel');
-  var open=panel.style.display!=='none';
-  panel.style.display=open?'none':'grid';
-  if(!open)panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+$('#btnSettings').onclick=function(){
+  $('#setMask').classList.add('show');
+  $('#setSheet').classList.add('show');
 };
+function closeSet(){
+  $('#setMask').classList.remove('show');
+  $('#setSheet').classList.remove('show');
+}
+$('#setMask').onclick=closeSet;
+$('#btnCloseSet').onclick=closeSet;
 
 /* ============ 备份 / 恢复 / 打包 ============ */
 function blobToB64(blob){
