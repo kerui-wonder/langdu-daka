@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#4b7cf5">
+<link rel="manifest" href="task-tracker.webmanifest">
+<link rel="icon" type="image/png" href="task-tracker-192.png">
+<title>任务复习追踪</title>
+<style>
+  :root {
+    --blue: #4b7cf5;
+    --purple: #7c5bff;
+    --red: #ff4d5e;
+    --green: #16b364;
+    --bg: #eef1f7;
+    --card: #ffffff;
+    --text: #24292f;
+    --muted: #7a8494;
+    --border: #e3e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 16px 12px 60px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+  .stats { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .stat {
+    flex: 1; min-width: 130px; background: var(--card); border-radius: 12px;
+    padding: 12px 14px; box-shadow: 0 1px 3px rgba(30,40,70,.06);
+  }
+  .stat .num { font-size: 22px; font-weight: 700; }
+  .stat .num.alert { color: var(--red); }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .card {
+    background: var(--card); border-radius: 14px; padding: 16px;
+    box-shadow: 0 1px 3px rgba(30,40,70,.06); margin-bottom: 14px;
+  }
+
+  .addrow { display: flex; gap: 8px; }
+  input[type=text], select, input[type=date] {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px;
+    font-size: 14px; font-family: inherit; background: #fbfcfe; color: var(--text);
+    width: 100%;
+  }
+  input:focus, select:focus { outline: 2px solid rgba(75,124,245,.35); border-color: var(--blue); }
+
+  button {
+    border: none; border-radius: 8px; padding: 9px 14px; font-size: 14px;
+    cursor: pointer; font-family: inherit; background: #e8edf5; color: var(--text);
+    white-space: nowrap;
+  }
+  button:hover { filter: brightness(.96); }
+  button.primary { background: var(--blue); color: #fff; }
+  button.green { background: var(--green); color: #fff; }
+  button.warn { background: var(--red); color: #fff; }
+  button.ghost { background: transparent; color: var(--muted); padding: 6px 8px; font-size: 13px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+
+  .tabs { display: flex; gap: 6px; margin: 18px 0 14px; }
+  .tabs button { border-radius: 10px; padding: 9px 18px; background: transparent; color: var(--muted); font-weight: 600; }
+  .tabs button.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(30,40,70,.08); }
+
+  .section-title { font-size: 14px; font-weight: 700; margin: 4px 2px 10px; }
+  .section-title .cnt { color: var(--red); }
+
+  .task { display: flex; gap: 12px; align-items: flex-start; }
+  .task .info { flex: 1; min-width: 0; }
+  .task .name { font-size: 16px; font-weight: 600; }
+  .task .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 52%; }
+
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .badge.ok { background: #e3f7ec; color: var(--green); }
+
+  .review-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .rv-title { font-size: 12px; color: var(--muted); }
+  button.rv-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #eef1f7; color: var(--muted); cursor: default; }
+  button.rv-chip.done { background: #e3f7ec; color: var(--green); }
+  button.rv-chip.next { background: var(--blue); color: #fff; }
+  button.rv-chip.overdue { background: #ffe9eb; color: var(--red); }
+
+  .subs { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+  .sub-row { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0; flex-wrap: wrap; }
+  .sub-title { font-weight: 600; }
+  .sub-row.finished .sub-title { text-decoration: line-through; color: var(--muted); }
+  .sub-meta { font-size: 12px; color: var(--muted); }
+  .sub-meta.due { color: var(--red); font-weight: 700; }
+  .sub-meta.ok { color: var(--green); }
+  .sub-row .grow { flex: 1; }
+  button.sub-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+  button.sub-btn.green { background: var(--green); color: #fff; }
+  button.sub-btn.warn { background: var(--red); color: #fff; }
+  button.sub-btn.plain { background: var(--blue); color: #fff; opacity: .75; }
+  .sub-add { display: flex; gap: 6px; margin-top: 4px; }
+  .sub-add input { padding: 5px 8px; font-size: 13px; }
+
+  .empty { text-align: center; color: var(--muted); padding: 28px 0; font-size: 14px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .tbl-scroll { overflow-x: auto; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .toolbar select { width: auto; min-width: 160px; }
+  .spacer { flex: 1; }
+
+  .chart { display: flex; align-items: flex-end; gap: 3px; height: 130px; margin: 16px 0 4px; }
+  .barwrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; }
+  .bar { width: 100%; max-width: 26px; background: var(--blue); border-radius: 3px 3px 0 0; min-height: 2px; }
+  .barwrap.zero .bar { background: #e8edf5; }
+  .barwrap:last-child .bar { background: var(--red); }
+  .barlbl { font-size: 10px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; max-width: 100%; }
+  .chart-summary { font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(20,28,50,.45); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 14px; padding: 18px; width: 100%;
+    max-width: 420px; max-height: 85vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 16px; margin-bottom: 12px; }
+  .modal .field { margin-bottom: 12px; }
+  .modal .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .modal .btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  .modal .inline { display: flex; gap: 8px; }
+  .modal .inline > * { flex: 1; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: #2b3245; color: #fff; padding: 10px 18px; border-radius: 10px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99;
+    max-width: 90vw;
+  }
+  #toast.show { opacity: 1; }
+  .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 24px; }
+
+  @media (max-width: 560px) {
+    .task { flex-direction: column; align-items: stretch; }
+    .task .actions { max-width: none; justify-content: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>任务复习追踪</h1>
+  <div class="sub">任务按 1 → 3 → 7 → 14 → 30 天复习；有子任务时，只复习子任务，且每个子任务相互独立</div>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="stDue">0</div><div class="lbl">今日待复习（含逾期）</div></div>
+    <div class="stat"><div class="num" id="stTasks">0</div><div class="lbl">任务总数</div></div>
+    <div class="stat"><div class="num" id="stDone">0</div><div class="lbl">累计完成复习</div></div>
+  </div>
+
+  <div class="card">
+    <div class="addrow">
+      <input type="text" id="newTaskName" placeholder="新任务名称，例如：背单词" maxlength="60">
+      <button class="primary" onclick="addTask()">＋ 新建任务</button>
+    </div>
+    <div class="hint">没有子任务的任务：明天第 1 次复习，之后按 3 / 7 / 14 / 30 天推进；添加子任务后，改为只复习子任务（每个子任务独立从明天开始）</div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabReview" class="active" onclick="switchTab('review')">复习</button>
+    <button id="tabStats" onclick="switchTab('stats')">统计</button>
+  </div>
+
+  <div id="viewReview">
+    <div id="dueSection"></div>
+    <div class="section-title">全部任务</div>
+    <div id="taskList"></div>
+  </div>
+
+  <div id="viewStats" style="display:none">
+    <div class="card">
+      <div class="toolbar">
+        <select id="statRange" onchange="renderStatsTab()">
+          <option value="7d">近 7 天 · 按日</option>
+          <option value="30d" selected>近 30 天 · 按日</option>
+          <option value="12w">近 12 周 · 按周</option>
+          <option value="12m">近 12 月 · 按月</option>
+        </select>
+        <div class="spacer"></div>
+        <button onclick="exportJSON()">备份 JSON</button>
+        <button onclick="document.getElementById('importFile').click()">导入备份</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+      </div>
+      <div class="chart" id="statChart"></div>
+      <div class="chart-summary" id="statSummary"></div>
+    </div>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:10px">复习进度</h3>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>任务</th><th>已完成复习</th><th>下次复习</th></tr></thead>
+          <tbody id="statBody"></tbody>
+        </table>
+      </div>
+      <div id="statEmpty" class="empty" style="display:none">还没有任务</div>
+    </div>
+  </div>
+
+  <div class="footer">任务复习追踪 · 版本 v7</div>
+</div>
+
+<div class="modal-mask" id="modalMask">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+var STORE_KEY = 'task-tracker-v1';
+var REVIEW_DAYS = [1, 3, 7, 14, 30];
+var state = { tasks: [], logs: [] };
+var subInputOpen = {}; /* taskId -> 是否展开子任务输入框 */
+
+function load() {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.tasks) && Array.isArray(parsed.logs)) state = parsed;
+    }
+  } catch (e) { /* 损坏的数据当作空库处理 */ }
+  normalize();
+  save();
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function newReview() { return { enabled: true, anchor: startOfToday(), done: [null, null, null, null, null] }; }
+function normalize() {
+  state.tasks.forEach(function (t) {
+    if (!t.id) t.id = uid();
+    if (!('desc' in t)) t.desc = '';
+    if (!('goal' in t)) t.goal = null;
+    if (!('dependsOn' in t)) t.dependsOn = null;
+    if (!Array.isArray(t.subs)) t.subs = [];
+    if (!t.review || typeof t.review !== 'object') t.review = newReview();
+    if (!Array.isArray(t.review.done) || t.review.done.length !== REVIEW_DAYS.length) {
+      var oldDone = Array.isArray(t.review.done) ? t.review.done : [];
+      t.review.done = REVIEW_DAYS.map(function (x, i) { return oldDone[i] || null; });
+    }
+    if (t.review.enabled && !t.review.anchor) t.review.anchor = startOfToday();
+    t.subs.forEach(function (s) {
+      if (!s.id) s.id = uid();
+      if (!s.review || typeof s.review !== 'object') s.review = newReview();
+      if (!Array.isArray(s.review.done) || s.review.done.length !== REVIEW_DAYS.length) {
+        var od = Array.isArray(s.review.done) ? s.review.done : [];
+        s.review.done = REVIEW_DAYS.map(function (x, i) { return od[i] || null; });
+      }
+      if (!s.review.anchor) s.review.anchor = startOfToday();
+    });
+  });
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtDate(ts) {
+  var d = new Date(ts);
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function startOfToday() {
+  var d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function taskById(id) {
+  for (var i = 0; i < state.tasks.length; i++) if (state.tasks[i].id === id) return state.tasks[i];
+  return null;
+}
+
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function () { t.classList.remove('show'); }, 2200);
+}
+
+/* ---------- 复习计划（1/3/7/14/30 天，按顺序） ----------
+   复习单位：任务没有子任务时复习任务本身；有子任务时只复习每个子任务（相互独立）。 */
+
+/* 复习单位统一抽象：[{t, s}]，s 为 null 表示复习任务本身 */
+function itemsOf(t) {
+  if (t.subs.length) return t.subs.map(function (s) { return { t: t, s: s }; });
+  return [{ t: t, s: null }];
+}
+function rvOf(item) { return item.s ? item.s.review : item.t.review; }
+function itemName(item) { return item.s ? item.s.title : item.t.name; }
+function rvDueDate(rv, i) {
+  var d = new Date(rv.anchor);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + REVIEW_DAYS[i]);
+  return d;
+}
+function rvNext(rv) {
+  for (var i = 0; i < rv.done.length; i++) if (!rv.done[i]) return i;
+  return -1;
+}
+function itemDueToday(item) {
+  var rv = rvOf(item);
+  var i = rvNext(rv);
+  return i >= 0 && fmtDate(rvDueDate(rv, i)) <= fmtDate(Date.now());
+}
+
+function completeReview(taskId, subId) {
+  var t = taskById(taskId);
+  if (!t) return;
+  var item = subId
+    ? itemsOf(t).filter(function (x) { return x.s && x.s.id === subId; })[0]
+    : itemsOf(t)[0];
+  if (!item) return;
+  var rv = rvOf(item);
+  var i = rvNext(rv);
+  if (i < 0) return;
+  rv.done[i] = { ts: Date.now() };
+  save(); renderAll();
+  var label = item.s ? '「' + item.s.title + '」' : '';
+  if (i + 1 < REVIEW_DAYS.length) {
+    toast('已完成 ' + label + '第 ' + (i + 1) + ' 次复习，下次：' + fmtDate(rvDueDate(rv, i + 1)));
+  } else {
+    toast(label ? '「' + item.s.title + '」五次复习全部完成 🎉' : '五次复习全部完成 🎉');
+  }
+}
+
+function undoReview(taskId, subId) {
+  var t = taskById(taskId);
+  if (!t) return;
+  var item = subId
+    ? itemsOf(t).filter(function (x) { return x.s && x.s.id === subId; })[0]
+    : itemsOf(t)[0];
+  if (!item) return;
+  var rv = rvOf(item);
+  var lastDone = -1;
+  for (var j = 0; j < rv.done.length; j++) if (rv.done[j]) lastDone = j;
+  if (lastDone < 0) return;
+  openModal('撤销复习',
+    '<p style="font-size:14px;line-height:1.7">撤销「' + esc(itemName(item)) + '」第 ' + (lastDone + 1) + ' 次复习（' + REVIEW_DAYS[lastDone] + ' 天）吗？</p>',
+    [{ label: '取消' }, { label: '撤销', cls: 'primary', style: 'background:var(--red)', fn: function () {
+      rv.done[lastDone] = null;
+      save(); renderAll(); toast('已撤销');
+    } }]);
+}
+
+/* ---------- 子任务 ---------- */
+function addSub(taskId, inputEl) {
+  var t = taskById(taskId);
+  if (!t) return;
+  var title = inputEl.value.trim();
+  if (!title) { toast('子任务内容不能为空'); return; }
+  var dup = t.subs.some(function (s) { return s.title === title; });
+  if (dup) { toast('已有同名子任务'); inputEl.value = ''; return; }
+  t.subs.push({ id: uid(), title: title, review: newReview() });
+  inputEl.value = '';
+  save(); renderReview();
+}
+
+function subKeydown(event, taskId) {
+  if (event.isComposing || event.keyCode === 229) return; /* 输入法选字回车不算提交 */
+  if (event.key === 'Enter') addSub(taskId, event.target);
+}
+
+function deleteSub(taskId, subId) {
+  var t = taskById(taskId);
+  if (!t) return;
+  t.subs = t.subs.filter(function (s) { return s.id !== subId; });
+  save(); renderReview();
+}
+
+function toggleSubInput(taskId) {
+  subInputOpen[taskId] = !subInputOpen[taskId];
+  renderReview();
+  if (subInputOpen[taskId]) {
+    var el = document.getElementById('subInput-' + taskId);
+    if (el) el.focus();
+  }
+}
+
+/* ---------- 任务 ---------- */
+function addTask() {
+  var el = document.getElementById('newTaskName');
+  var name = el.value.trim();
+  if (!name) { toast('请先输入任务名称'); return; }
+  state.tasks.unshift({
+    id: uid(), name: name, desc: '', createdAt: Date.now(),
+    goal: null, dependsOn: null, subs: [],
+    review: newReview()
+  });
+  el.value = '';
+  save(); renderAll();
+  toast('已创建，明天进行第 1 次复习');
+}
+
+function deleteTask(id) {
+  var t = taskById(id);
+  if (!t) return;
+  openModal('删除任务',
+    '<p style="font-size:14px;line-height:1.7">确定删除任务「' + esc(t.name) + '」吗？包括它的子任务和复习进度，且无法恢复。</p>',
+    [{ label: '取消' }, { label: '删除', cls: 'primary', style: 'background:var(--red)', fn: function () {
+      state.tasks = state.tasks.filter(function (x) { return x.id !== id; });
+      save(); renderAll(); toast('已删除');
+    } }]);
+}
+
+function editTask(id) {
+  var t = taskById(id);
+  if (!t) return;
+  var hasSubs = t.subs.length > 0;
+  openModal('编辑任务',
+    '<div class="field"><label>任务名称</label><input type="text" id="mName" maxlength="60" value="' + esc(t.name) + '"></div>' +
+    (hasSubs
+      ? '<div class="hint" style="margin-bottom:12px">该任务已有子任务：当前只复习子任务（每个子任务独立）。删除全部子任务后，任务自身的复习计划会恢复。</div>'
+      : '<div class="field"><label>复习计划（1 / 3 / 7 / 14 / 30 天）</label><div class="inline">' +
+          '<select id="mReview">' +
+            '<option value="on"' + (t.review.enabled ? ' selected' : '') + '>开启</option>' +
+            '<option value="off"' + (!t.review.enabled ? ' selected' : '') + '>关闭</option>' +
+          '</select>' +
+          '<input type="date" id="mAnchor" value="' + (t.review.anchor ? fmtDate(t.review.anchor) : '') + '">' +
+        '</div><div style="font-size:12px;color:var(--muted);margin-top:4px">日期 = 复习起点（第 1 次复习在起点后 1 天）</div></div>'),
+    [{ label: '取消' }, { label: '保存', cls: 'primary', fn: function () {
+      var name = document.getElementById('mName').value.trim();
+      if (!name) { toast('名称不能为空'); return; }
+      t.name = name;
+      if (!hasSubs) {
+        t.review.enabled = document.getElementById('mReview').value === 'on';
+        var anchorVal = document.getElementById('mAnchor').value;
+        if (t.review.enabled && anchorVal) {
+          var ad = new Date(anchorVal + 'T00:00:00');
+          if (!isNaN(ad.getTime())) t.review.anchor = ad.getTime();
+        }
+      }
+      save(); renderAll(); closeModal();
+    } }]);
+}
+
+/* ---------- 渲染 ---------- */
+function allItems() {
+  var list = [];
+  state.tasks.forEach(function (t) {
+    itemsOf(t).forEach(function (item) { list.push(item); });
+  });
+  return list;
+}
+
+function renderStats() {
+  var dueCount = 0, doneCount = 0;
+  allItems().forEach(function (item) {
+    if (itemDueToday(item)) dueCount++;
+    rvOf(item).done.forEach(function (d) { if (d) doneCount++; });
+  });
+  document.getElementById('stDue').textContent = dueCount;
+  document.getElementById('stDue').classList.toggle('alert', dueCount > 0);
+  document.getElementById('stTasks').textContent = state.tasks.length;
+  document.getElementById('stDone').textContent = doneCount;
+}
+
+function chipsHtml(rv) {
+  return '<div class="review-row"><span class="rv-title">复习</span>' +
+    REVIEW_DAYS.map(function (days, i) {
+      var st = rv.done[i] ? 'done' : (i === rvNext(rv) ? (fmtDate(rvDueDate(rv, i)) <= fmtDate(Date.now()) ? 'overdue' : 'next') : '');
+      var tip = rv.done[i]
+        ? '第 ' + (i + 1) + ' 次复习 · 完成于 ' + fmtDate(rv.done[i].ts)
+        : '第 ' + (i + 1) + ' 次复习 · 计划 ' + fmtDate(rvDueDate(rv, i));
+      return '<button class="rv-chip ' + st + '" title="' + esc(tip) + '">' + (st === 'done' ? '✓ ' : '') + days + '天</button>';
+    }).join('') +
+  '</div>';
+}
+
+function nextActionButton(item) {
+  var rv = rvOf(item);
+  var i = rvNext(rv);
+  if (i < 0) return '<span class="badge ok">五次复习已完成 🎉</span>';
+  var due = fmtDate(rvDueDate(rv, i));
+  var today = fmtDate(Date.now());
+  var arg = '\'' + item.t.id + '\'' + (item.s ? ',\'' + item.s.id + '\'' : '');
+  if (due < today) {
+    var late = Math.round((new Date(today) - new Date(due)) / 86400000);
+    return '<button class="warn" onclick="completeReview(' + arg + ')">复习 第' + (i + 1) + '次 · 逾期' + late + '天</button>';
+  }
+  if (due === today) return '<button class="green" onclick="completeReview(' + arg + ')">复习 第' + (i + 1) + '次 · 今天</button>';
+  return '<button class="primary" style="opacity:.75" onclick="completeReview(' + arg + ')">提前复习 第' + (i + 1) + '次 · ' + due + '</button>';
+}
+
+function subRowHtml(item) {
+  var s = item.s, rv = s.review;
+  var i = rvNext(rv);
+  var meta = '', btn = '', undo = '';
+  if (i < 0) {
+    meta = '<span class="sub-meta ok">✓ 5次完成</span>';
+    undo = '<button class="ghost" onclick="undoReview(\'' + item.t.id + '\',\'' + s.id + '\')">撤</button>';
+  } else {
+    var due = fmtDate(rvDueDate(rv, i));
+    var today = fmtDate(Date.now());
+    if (due < today) {
+      var late = Math.round((new Date(today) - new Date(due)) / 86400000);
+      meta = '<span class="sub-meta due">第' + (i + 1) + '次 · 逾期' + late + '天</span>';
+      btn = '<button class="sub-btn warn" onclick="completeReview(\'' + item.t.id + '\',\'' + s.id + '\')">复习</button>';
+    } else if (due === today) {
+      meta = '<span class="sub-meta due">第' + (i + 1) + '次 · 今天</span>';
+      btn = '<button class="sub-btn green" onclick="completeReview(\'' + item.t.id + '\',\'' + s.id + '\')">复习</button>';
+    } else {
+      meta = '<span class="sub-meta">第' + (i + 1) + '次 · ' + due + '</span>';
+      btn = '<button class="sub-btn plain" onclick="completeReview(\'' + item.t.id + '\',\'' + s.id + '\')">提前复习</button>';
+    }
+  }
+  return '<div class="sub-row' + (i < 0 ? ' finished' : '') + '">' +
+    '<span class="sub-title">' + esc(s.title) + '</span>' + meta +
+    '<span class="grow"></span>' + btn + undo +
+    '<button class="ghost" style="color:var(--red)" onclick="deleteSub(\'' + item.t.id + '\',\'' + s.id + '\')">✕</button>' +
+  '</div>';
+}
+
+function taskCard(t) {
+  var hasSubs = t.subs.length > 0;
+  var info = '<div class="info"><div class="name">' + esc(t.name) + '</div>';
+  if (hasSubs) {
+    info += '<div class="subs">' +
+      itemsOf(t).map(subRowHtml).join('') +
+      (subInputOpen[t.id]
+        ? '<div class="sub-add"><input type="text" id="subInput-' + t.id + '" placeholder="子任务内容，回车添加" onkeydown="subKeydown(event, \'' + t.id + '\')"></div>'
+        : '<button class="ghost" onclick="toggleSubInput(\'' + t.id + '\')">＋ 子任务</button>') +
+      '</div>';
+  } else {
+    info += (t.review.enabled ? chipsHtml(t.review) : '<div class="hint">复习计划已关闭</div>') +
+      '<div class="review-row"><button class="ghost" onclick="toggleSubInput(\'' + t.id + '\')">＋ 子任务</button>' +
+      (subInputOpen[t.id]
+        ? '<div class="sub-add" style="flex:1"><input type="text" id="subInput-' + t.id + '" placeholder="子任务内容，回车添加" onkeydown="subKeydown(event, \'' + t.id + '\')"></div>'
+        : '') +
+      '</div>';
+  }
+  info += '</div>';
+  var actions = '';
+  if (!hasSubs && t.review.enabled) actions += nextActionButton(itemsOf(t)[0]);
+  else if (hasSubs) actions += '<span class="sub-meta">子任务独立复习</span>';
+  actions += '<button class="ghost" onclick="editTask(\'' + t.id + '\')">编辑</button>' +
+    '<button class="ghost" style="color:var(--red)" onclick="deleteTask(\'' + t.id + '\')">删除</button>';
+  return '<div class="card task">' + info + '<div class="actions">' + actions + '</div></div>';
+}
+
+function renderReview() {
+  var today = fmtDate(Date.now());
+  var due = allItems().filter(itemDueToday);
+  var dueIds = {};
+  due.forEach(function (item) { dueIds[item.s ? item.s.id : item.t.id] = true; });
+  var rest = state.tasks.filter(function (t) {
+    return itemsOf(t).some(function (item) { return !dueIds[item.s ? item.s.id : item.t.id]; }) || !itemsOf(t).length;
+  });
+
+  var dueHtml = '';
+  if (due.length) {
+    dueHtml = '<div class="section-title">今天该复习 <span class="cnt">' + due.length + '</span></div>' +
+      due.map(function (item) {
+        var rv = rvOf(item);
+        var i = rvNext(rv);
+        var dueD = fmtDate(rvDueDate(rv, i));
+        var title = item.t.name + (item.s ? ' · ' + item.s.title : '');
+        var tag = dueD < today ? '<span class="rv-title">逾期（计划 ' + dueD + '）</span>' : '<span class="rv-title">计划今天</span>';
+        var arg = '\'' + item.t.id + '\'' + (item.s ? ',\'' + item.s.id + '\'' : '');
+        return '<div class="card task">' +
+          '<div class="info"><div class="name">' + esc(title) + '</div>' +
+          '<div class="review-row">' + tag + '<span class="rv-title">第 ' + (i + 1) + ' 次 · ' + REVIEW_DAYS[i] + ' 天间隔</span></div></div>' +
+          '<div class="actions"><button class="green" onclick="completeReview(' + arg + ')">完成复习</button></div>' +
+        '</div>';
+      }).join('');
+  } else {
+    dueHtml = '<div class="card"><div class="empty">今天没有待复习的任务 ✓</div></div>';
+  }
+  document.getElementById('dueSection').innerHTML = dueHtml;
+  document.getElementById('taskList').innerHTML = rest.length
+    ? rest.map(taskCard).join('')
+    : (due.length ? '' : '<div class="card"><div class="empty">还没有任务，先在上方新建一个吧</div></div>');
+}
+
+function renderStatsTab() {
+  var RANGES = { '7d': ['day', 7], '30d': ['day', 30], '12w': ['week', 12], '12m': ['month', 12] };
+  var conf = RANGES[document.getElementById('statRange').value] || RANGES['30d'];
+  var unit = conf[0], count = conf[1];
+  var keys = buildBuckets(unit, count);
+  var agg = {};
+  keys.forEach(function (k) { agg[k] = 0; });
+  allItems().forEach(function (item) {
+    rvOf(item).done.forEach(function (d) {
+      if (!d) return;
+      var k = bucketKey(d.ts, unit);
+      if (k in agg) agg[k]++;
+    });
+  });
+  var maxN = 1, sumN = 0;
+  keys.forEach(function (k) { if (agg[k] > maxN) maxN = agg[k]; sumN += agg[k]; });
+  document.getElementById('statChart').innerHTML = keys.map(function (k) {
+    var n = agg[k];
+    var h = Math.max(2, Math.round(n / maxN * 100));
+    return '<div class="barwrap' + (n === 0 ? ' zero' : '') + '" title="' + bucketLabel(k, unit) + '：' + n + ' 次">' +
+      '<div class="bar" style="height:' + h + '%"></div>' +
+      '<div class="barlbl">' + bucketLabel(k, unit) + '</div></div>';
+  }).join('');
+  document.getElementById('statSummary').textContent = '合计完成复习 ' + sumN + ' 次 · 单期峰值 ' + maxN + ' 次';
+
+  var body = document.getElementById('statBody');
+  document.getElementById('statEmpty').style.display = state.tasks.length ? 'none' : 'block';
+  body.innerHTML = state.tasks.map(function (t) {
+    var items = itemsOf(t);
+    var doneN = 0, totalN = 0, nextInfo = null;
+    items.forEach(function (item) {
+      var rv = rvOf(item);
+      rv.done.forEach(function (d) { if (d) doneN++; });
+      totalN += REVIEW_DAYS.length;
+      var i = rvNext(rv);
+      if (i >= 0) {
+        var due = fmtDate(rvDueDate(rv, i));
+        if (!nextInfo || due < nextInfo.due) nextInfo = { i: i, due: due };
+      }
+    });
+    var nx;
+    if (items.length === 1 && !items[0].s && !items[0].t.review.enabled) nx = '已关闭';
+    else if (!nextInfo) nx = '已全部完成 ✓';
+    else nx = '第' + (nextInfo.i + 1) + '次 ' + nextInfo.due +
+      (nextInfo.due < fmtDate(Date.now()) ? '（逾期）' : '');
+    return '<tr><td>' + esc(t.name) + (t.subs.length ? '<span class="rv-title">（' + t.subs.length + ' 个子任务）</span>' : '') + '</td>' +
+      '<td>' + doneN + ' / ' + totalN + '</td><td>' + nx + '</td></tr>';
+  }).join('');
+}
+
+/* ---------- 汇总键（日/周/月） ---------- */
+function bucketKey(ts, unit) {
+  if (unit === 'month') {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+  }
+  if (unit === 'week') {
+    var dow = (new Date(ts).getDay() + 6) % 7;
+    var mon = new Date(ts); mon.setHours(0, 0, 0, 0);
+    mon.setDate(mon.getDate() - dow);
+    return fmtDate(mon);
+  }
+  return fmtDate(ts);
+}
+function bucketLabel(key, unit) {
+  if (unit === 'month') return key;
+  return key.slice(5);
+}
+function buildBuckets(unit, count) {
+  var keys = [], now = new Date(), i;
+  if (unit === 'day') {
+    for (i = count - 1; i >= 0; i--) {
+      var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      keys.push(fmtDate(d));
+    }
+  } else if (unit === 'week') {
+    var dow = (now.getDay() + 6) % 7;
+    var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+    for (i = count - 1; i >= 0; i--) {
+      var w = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7 * i);
+      keys.push(fmtDate(w));
+    }
+  } else {
+    for (i = count - 1; i >= 0; i--) {
+      var m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push(m.getFullYear() + '-' + pad(m.getMonth() + 1));
+    }
+  }
+  return keys;
+}
+
+function renderAll() {
+  renderStats(); renderReview(); renderStatsTab();
+}
+
+function switchTab(tab) {
+  document.getElementById('viewReview').style.display = tab === 'review' ? '' : 'none';
+  document.getElementById('viewStats').style.display = tab === 'stats' ? '' : 'none';
+  document.getElementById('tabReview').classList.toggle('active', tab === 'review');
+  document.getElementById('tabStats').classList.toggle('active', tab === 'stats');
+  if (tab === 'stats') renderStatsTab();
+}
+
+/* ---------- 弹窗 ---------- */
+function openModal(title, bodyHtml, btns) {
+  var box = document.getElementById('modalBox');
+  box.innerHTML = '<h3>' + esc(title) + '</h3>' + bodyHtml + '<div class="btns" id="modalBtns"></div>';
+  var bar = document.getElementById('modalBtns');
+  btns.forEach(function (b) {
+    var el = document.createElement('button');
+    el.textContent = b.label;
+    if (b.cls) el.className = b.cls;
+    if (b.style) el.setAttribute('style', b.style);
+    el.onclick = function () { if (b.fn) b.fn(); closeModal(); };
+    bar.appendChild(el);
+  });
+  document.getElementById('modalMask').classList.add('show');
+  var first = box.querySelector('input,select');
+  if (first) setTimeout(function () { first.focus(); }, 50);
+}
+function closeModal() { document.getElementById('modalMask').classList.remove('show'); }
+document.getElementById('modalMask').addEventListener('click', function (e) {
+  if (e.target === this) closeModal();
+});
+
+/* ---------- 导入导出 ---------- */
+function download(filename, text, mime) {
+  var blob = new Blob([text], { type: mime || 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+}
+
+function exportJSON() {
+  download('task-tracker-backup-' + fmtDate(Date.now()) + '.json', JSON.stringify(state, null, 2));
+  toast('已导出备份文件');
+}
+
+function importJSON(input) {
+  var file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    var data;
+    try {
+      data = JSON.parse(reader.result);
+      if (!data || !Array.isArray(data.tasks)) throw new Error('bad');
+    } catch (e) { toast('文件格式不正确，导入失败'); return; }
+    openModal('导入备份',
+      '<p style="font-size:14px;line-height:1.7">备份中包含 ' + data.tasks.length + ' 个任务。<br>选择「合并」会追加到现有数据；选择「覆盖」会替换现有全部数据。</p>',
+      [
+        { label: '取消' },
+        { label: '合并导入', fn: function () { doImport(data, true); } },
+        { label: '覆盖导入', cls: 'primary', style: 'background:var(--red)', fn: function () { doImport(data, false); } }
+      ]);
+  };
+  reader.readAsText(file);
+}
+
+function doImport(data, merge) {
+  if (!merge) {
+    state = { tasks: data.tasks, logs: data.logs || [] };
+  } else {
+    var idMaps = { tasks: {}, subs: {} };
+    data.tasks.forEach(function (t) {
+      var nid = taskById(t.id) ? uid() : t.id;
+      idMaps.tasks[t.id] = nid;
+      var copy = Object.assign({}, t, { id: nid });
+      copy.subs = (t.subs || []).map(function (s) {
+        var sid = uid();
+        idMaps.subs[s.id] = sid;
+        return Object.assign({}, s, { id: sid });
+      });
+      state.tasks.push(copy);
+    });
+  }
+  normalize();
+  save(); renderAll(); closeModal(); toast('导入完成');
+}
+
+/* ---------- 启动 ---------- */
+document.getElementById('newTaskName').addEventListener('keydown', function (e) {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === 'Enter') addTask();
+});
+load();
+renderAll();
+
+/* PWA：本地服务下注册 Service Worker；file:// 直接打开时自动跳过 */
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  navigator.serviceWorker.register('task-tracker-sw.js').then(function (reg) {
+    reg.addEventListener('updatefound', function () {
+      var nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', function () {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          toast('已更新到最新版本，请刷新页面');
+        }
+      });
+    });
+  }).catch(function () { /* 注册失败不影响使用 */ });
+}
+</script>
+</body>
+</html>
