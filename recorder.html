@@ -78,6 +78,13 @@ h2.sec{font-size:16px;margin:4px 2px 12px}
 .recbig:active{transform:scale(.98)}
 .recbig.recording{background:var(--red);animation:pulse 1.1s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,77,94,.45)}70%{box-shadow:0 0 0 14px rgba(255,77,94,0)}100%{box-shadow:0 0 0 0 rgba(255,77,94,0)}}
+.rehbtn{display:block;width:100%;margin-top:8px;padding:11px;border-radius:16px;background:#fff;border:2px solid #e3e9ff;color:var(--blue);font-size:14px;font-weight:700}
+.rehbtn:active{background:#f2f5ff}
+.reh-head{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:#9aa5b8;cursor:pointer}
+.reh-head .arrow{transition:transform .2s}
+.reh-head .arrow.up{transform:rotate(180deg)}
+.reh-list{display:none;margin-top:4px}
+.reh-list.show{display:block}
 
 .rec-head{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
 .rec-head .arrow{transition:transform .2s}
@@ -205,7 +212,7 @@ nav button.active{color:var(--blue);font-weight:700}
       <h2 class="sec">每日目标遍数</h2>
       <div id="repList"></div>
       <div class="empty" id="emptyMine" hidden><p>先去添加脚本吧。</p></div>
-      <div style="text-align:center;font-size:11px;color:#aab3c5;margin-top:16px;padding:8px 0" id="verTag">版本 v16</div>
+      <div style="text-align:center;font-size:11px;color:#aab3c5;margin-top:16px;padding:8px 0" id="verTag">版本 v17</div>
       <input type="file" id="fileImport" accept=".json,application/json" hidden>
     </section>
   </main>
@@ -266,13 +273,33 @@ nav button.active{color:var(--blue);font-weight:700}
 </div>
 
 <!-- 全屏朗读 -->
-<div class="reader" id="reader">
-  <div class="reader-top">
+<div class="reader" id="reader">  <div class="reader-top">
     <span class="t" id="readerTitle">朗读</span>
     <button id="btnAutoScroll">自动滚动</button>
     <button id="btnCloseReader">关闭 ✕</button>
   </div>
   <div class="reader-body" id="readerBody"></div>
+</div>
+
+<!-- 复述练习 -->
+<div class="reader" id="reh">
+  <div class="reader-top">
+    <span class="t" id="rehTitle">复述练习</span>
+    <button id="btnCloseReh">关闭 ✕</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:18px 22px 40px;-webkit-overflow-scrolling:touch">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">这一遍换个方向说（点标签换一个角度）</div>
+    <button class="tagchip" id="rehAngle" style="font-size:13px;padding:7px 15px;cursor:pointer;max-width:100%;white-space:normal;text-align:left">…</button>
+    <div style="margin-top:16px">
+      <button class="text-toggle" id="rehRefToggle">偷看原文 ▾</button>
+      <div class="script-text" id="rehRefText" style="display:none;margin-top:4px"></div>
+    </div>
+    <button class="recbig" id="rehRec" style="margin-top:18px">🎙 开始复述（不计遍数）</button>
+    <div style="margin-top:16px">
+      <div class="rec-head" style="margin-top:0;padding-top:0;border-top:0"><span>复述记录（<b id="rehCnt">0</b>）</span><span style="font-size:10px">仅存本机 · 不计遍数</span></div>
+      <div class="rec-list show" id="rehList"></div>
+    </div>
+  </div>
 </div>
 
 <canvas id="confetti"></canvas>
@@ -312,7 +339,8 @@ function saveAll(){
     store.clear();
     scripts.forEach(function(s){
       var copy={id:s.id,title:s.title,tag:s.tag,text:s.text,target:s.target,collapsed:!!s.collapsed,tally:s.tally||{},
-        recordings:s.recordings.map(function(r){var o={id:r.id,name:r.name,type:r.type,dur:r.dur,ts:r.ts,blob:r.blob};return o;})};
+        recordings:s.recordings.map(function(r){var o={id:r.id,name:r.name,type:r.type,dur:r.dur,ts:r.ts,blob:r.blob};return o;}),
+        rehearsals:(s.rehearsals||[]).map(function(r){var o={id:r.id,name:r.name,type:r.type,dur:r.dur,ts:r.ts,blob:r.blob};return o;})};
       store.put(copy);
     });
     store.transaction.oncomplete=res;
@@ -325,8 +353,9 @@ function loadAll(){
     var req=store.getAll();
     req.onsuccess=function(){
       scripts=(req.result||[]).map(function(s){
-        var c=Object.assign({title:'',tag:'',collapsed:false,target:1,tally:{},recordings:[]},s);
+        var c=Object.assign({title:'',tag:'',collapsed:false,target:1,tally:{},recordings:[],rehearsals:[]},s);
         c.recordings=(c.recordings||[]).map(function(r){return Object.assign({},r)});
+        c.rehearsals=(c.rehearsals||[]).map(function(r){return Object.assign({},r)});
         return c;
       });
       res();
@@ -401,8 +430,11 @@ function buildCard(s){
     '<div class="prog"><div class="track"><div class="fill" style="width:'+openPct+'%"></div></div>'+
     '<div class="lbl">今日 <b class="cnt">'+recsToday(s)+'</b> / <b class="tgt">'+Math.max(1,s.target)+'</b> 遍</div></div>'+
     '<button class="recbig" data-rec>🎙 开始朗读录音</button>'+
+    '<button class="rehbtn" data-reh>🗣 复述练习 · 不计遍数</button>'+
     '<div class="rec-head"><span>录音记录（<b class="rcnt">'+s.recordings.length+'</b>）</span><span class="arrow'+(s.collapsed?'':' up')+'">▾</span></div>'+
-    '<div class="rec-list'+(s.collapsed?'':' show')+'"></div>';
+    '<div class="rec-list'+(s.collapsed?'':' show')+'"></div>'+
+    '<div class="reh-head"><span>复述记录（<b class="rhcnt">'+(s.rehearsals||[]).length+'</b>）</span><span class="arrow">▾</span></div>'+
+    '<div class="reh-list"></div>';
   // 事件
   card.querySelector('.act-edit').onclick=function(){openSheet(s)};
   card.querySelector('.act-del').onclick=function(){delScript(s)};
@@ -418,6 +450,13 @@ function buildCard(s){
     card.querySelector('.rec-head .arrow').classList.toggle('up',!s.collapsed);
     saveAll();
   };
+  card.querySelector('[data-reh]').onclick=function(){openRehearse(s)};
+  card.querySelector('.reh-head').onclick=function(){
+    var list=card.querySelector('.reh-list');
+    var open=list.classList.toggle('show');
+    card.querySelector('.reh-head .arrow').classList.toggle('up',open);
+    if(open)renderCardRehList(s,card);
+  };
   card.querySelector('[data-rec]').onclick=function(){
     if(recTarget===s)stopRecording();else startRecording(s);
   };
@@ -428,10 +467,17 @@ function cardOf(s){return document.querySelector('.card[data-id="'+s.id+'"]')}
 function renderCardRecordings(s,card){
   card=card||cardOf(s);if(!card)return;
   var list=card.querySelector('.rec-list');list.innerHTML='';
-  s.recordings.slice().sort(function(a,b){return b.ts-a.ts}).forEach(function(r){list.appendChild(buildRecItem(s,r))});
+  s.recordings.slice().sort(function(a,b){return b.ts-a.ts}).forEach(function(r){list.appendChild(buildRecItem(s,r,'recordings'))});
   card.querySelector('.rcnt').textContent=s.recordings.length;
 }
-function buildRecItem(s,r){
+function renderCardRehList(s,card){
+  card=card||cardOf(s);if(!card)return;
+  var list=card.querySelector('.reh-list');list.innerHTML='';
+  (s.rehearsals||[]).slice().sort(function(a,b){return b.ts-a.ts}).forEach(function(r){list.appendChild(buildRecItem(s,r,'rehearsals'))});
+  card.querySelector('.rhcnt').textContent=(s.rehearsals||[]).length;
+}
+function buildRecItem(s,r,key){
+  key=key||'recordings';
   var div=document.createElement('div');
   div.className='rec-item';
   div.innerHTML=
@@ -447,13 +493,17 @@ function buildRecItem(s,r){
     dl(r.blob,r.name+'.'+ext);
   };
   div.querySelector('.act-rm').onclick=function(){
-    var idx=s.recordings.indexOf(r);
+    var arr=s[key];
+    var idx=arr.indexOf(r);
     if(idx<0)return;
-    s.recordings.splice(idx,1);
-    saveAll();refreshCard(s);refreshHero();renderAllRecs();renderReps();
+    arr.splice(idx,1);
+    saveAll();
+    if(key==='recordings'){refreshCard(s);renderCardRecordings(s);}else{renderCardRehList(s);}
+    refreshHero();renderAllRecs();
     setTrash('已删除「'+r.name+'」',function(){
-      s.recordings.splice(idx,0,r);saveAll();
-      refreshCard(s);refreshHero();renderAllRecs();renderReps();
+      arr.splice(idx,0,r);saveAll();
+      if(key==='recordings'){refreshCard(s);renderCardRecordings(s);}else{renderCardRehList(s);}
+      refreshHero();renderAllRecs();
     });
   };
   return div;
@@ -466,6 +516,7 @@ function refreshCard(s){
   card.querySelector('.prog .cnt').textContent=n;
   card.querySelector('.prog .tgt').textContent=t;
   card.querySelector('.rcnt').textContent=s.recordings.length;
+  card.querySelector('.rhcnt').textContent=(s.rehearsals||[]).length;
   refreshHero();
 }
 
@@ -491,6 +542,7 @@ function setRecBtn(s,recording){
 }
 async function startRecording(s){
   if(recTarget){toast('已有录音进行中');return}
+  if(rehTarget){toast('复述录音进行中，先停止它');return}
   if(!checkSupport()){toast('当前浏览器不支持录音');return}
   try{mediaStream=await navigator.mediaDevices.getUserMedia({audio:true})}
   catch(e){toast('无法访问麦克风：'+(e.name||e.message||'未知错误'));return}
@@ -555,6 +607,7 @@ function cleanAllRecordings(){
       s.tally[k]=(s.tally[k]||0)+1;
     });
     s.recordings=[];
+    s.rehearsals=[];
   });
   saveAll();
   scripts.forEach(function(s){refreshCard(s);renderCardRecordings(s)});
@@ -579,6 +632,100 @@ function releaseWakeLock(){if(wakeLock){try{wakeLock.release()}catch(e){}wakeLoc
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible'&&recTarget)requestWakeLock();
 });
+
+/* ============ 复述练习（不计遍数） ============ */
+var ANGLES=['用自己的话再说一遍','换个比喻来讲','当作在劝最好的朋友','说给一年前的自己听','用提问的方式说','只提炼一句最核心的','结合今天的一件小事说','如果不这么做，会失去什么'];
+var rehScript=null,rehTarget=null,rehRec=null,rehChunks=[],rehTimer=null,rehStart=0,rehAngleTxt='',rehAngleUsed='';
+function pickAngle(){
+  var a;
+  do{a=ANGLES[Math.floor(Math.random()*ANGLES.length)]}while(a===rehAngleTxt&&ANGLES.length>1);
+  rehAngleTxt=a;
+  $('#rehAngle').textContent=a;
+}
+function openRehearse(s){
+  rehScript=s;
+  $('#rehTitle').textContent='复述 · '+(s.title||'未命名');
+  $('#rehRefText').textContent=s.text;
+  $('#rehRefText').style.display='none';
+  $('#rehRefToggle').textContent='偷看原文 ▾';
+  rehAngleTxt='';
+  pickAngle();
+  renderRehList();
+  $('#reh').classList.add('show');
+}
+function closeRehearse(){
+  stopReh();
+  $('#reh').classList.remove('show');
+  rehScript=null;
+}
+function rehSetBtn(rec){
+  var b=$('#rehRec');
+  b.classList.toggle('recording',rec);
+  b.textContent=rec?'● 复述录音中 00:00 · 点击停止':'🎙 开始复述（不计遍数）';
+}
+function renderRehList(){
+  var list=$('#rehList');list.innerHTML='';
+  if(!rehScript)return;
+  (rehScript.rehearsals||[]).slice().sort(function(a,b){return b.ts-a.ts}).forEach(function(r){
+    list.appendChild(buildRecItem(rehScript,r,'rehearsals'));
+  });
+  $('#rehCnt').textContent=(rehScript.rehearsals||[]).length;
+}
+async function startReh(){
+  if(rehTarget)return;
+  if(recTarget){toast('先停止正在进行的朗读录音');return}
+  if(!checkSupport()){toast('当前浏览器不支持录音');return}
+  try{mediaStream=await navigator.mediaDevices.getUserMedia({audio:true})}
+  catch(e){toast('无法访问麦克风：'+(e.name||e.message||'未知错误'));return}
+  var mime=pickMime();
+  try{rehRec=new MediaRecorder(mediaStream,mime?{mimeType:mime}:undefined)}
+  catch(e){toast('录音启动失败');mediaStream.getTracks().forEach(function(t){t.stop()});mediaStream=null;return}
+  rehChunks=[];rehStart=Date.now();rehTarget=rehScript;rehAngleUsed=rehAngleTxt;
+  rehRec.ondataavailable=function(e){if(e.data&&e.data.size)rehChunks.push(e.data)};
+  rehRec.onstop=onStopReh;
+  rehRec.start(250);
+  rehSetBtn(true);
+  rehTimer=setInterval(function(){
+    $('#rehRec').textContent='● 复述录音中 '+fmtDur((Date.now()-rehStart)/1000)+' · 点击停止';
+  },250);
+  requestWakeLock();
+}
+function stopReh(){
+  if(!rehTarget)return;
+  clearInterval(rehTimer);rehTimer=null;
+  try{if(rehRec&&rehRec.state!=='inactive')rehRec.stop()}catch(e){}
+  if(mediaStream)mediaStream.getTracks().forEach(function(t){t.stop()});
+  mediaStream=null;
+  releaseWakeLock();
+}
+function onStopReh(){
+  var s=rehScript;
+  var type=(rehRec&&rehRec.mimeType)||pickMime()||'audio/webm';
+  var blob=new Blob(rehChunks,{type:type});
+  rehChunks=[];
+  rehSetBtn(false);
+  rehTarget=null;
+  if(!s)return;
+  if(!blob.size){toast('录音为空，未保存');return}
+  s.rehearsals=s.rehearsals||[];
+  s.rehearsals.push({id:'h'+Date.now()+Math.random().toString(36).slice(2,6),
+    name:'复述 · '+rehAngleUsed.slice(0,6),type:type,dur:Math.round((Date.now()-rehStart)/1000),
+    ts:Date.now(),blob:blob});
+  saveAll();
+  renderRehList();
+  renderCardRehList(s);
+  refreshHero();
+  toast('复述已记录（不计遍数）');
+}
+$('#rehRec').onclick=function(){if(rehTarget)stopReh();else startReh()};
+$('#rehAngle').onclick=pickAngle;
+$('#rehRefToggle').onclick=function(){
+  var tx=$('#rehRefText');
+  var open=tx.style.display!=='none';
+  tx.style.display=open?'none':'block';
+  $('#rehRefToggle').textContent=open?'偷看原文 ▾':'收起原文 ▴';
+};
+$('#btnCloseReh').onclick=closeRehearse;
 
 /* ============ 播放 ============ */
 function togglePlay(r,btn,item){
@@ -687,7 +834,7 @@ $('#btnSaveScript').onclick=function(){
   }else{
     scripts.push({id:'s'+Date.now()+Math.random().toString(36).slice(2,5),
       title:title||('脚本 '+(scripts.length+1)),tag:sheetTag==='无标签'?'':sheetTag,
-      text:text,target:sheetTarget,collapsed:false,recordings:[]});
+      text:text,target:sheetTarget,collapsed:false,recordings:[],rehearsals:[]});
   }
   saveAll();closeSheet();
   renderCards();renderAllRecs();renderReps();
@@ -776,6 +923,7 @@ async function importBackup(file){
       s.target=Math.max(1,is.target||1);s.collapsed=!!is.collapsed;
       s.tally=is.tally||{};
       s.recordings=s.recordings||[];
+      s.rehearsals=s.rehearsals||[];
       (is.recordings||[]).forEach(function(ir){
         if(!ir.audio)return;
         if(s.recordings.some(function(x){return x.id===ir.id}))return;
